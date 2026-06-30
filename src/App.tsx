@@ -3,10 +3,12 @@ import {Layout} from "./components/Layout";
 import { HomePage } from "./pages/HomePage";
 import { AuctionsPage } from "./pages/AuctionsPage";
 import { AuctionDetailsPage } from "./pages/AuctionDetailsPage";
+import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 
 function App(){
   return(
-    <BrowserRouter>        
+    <BrowserRouter>     
+        <AxiosInterceptorSetup />   
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />

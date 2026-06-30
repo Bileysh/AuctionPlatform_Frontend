@@ -1,6 +1,8 @@
 import { Link, Outlet } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 
 export function Layout() {
+ const { isAuthenticated, loginWithRedirect, logout, user, isLoading } = useAuth0();
   return (
 
     <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
@@ -17,8 +19,37 @@ export function Layout() {
               Всі аукціони
             </Link>
           </nav>
+          <div className="flex items-center border-l pl-8 border-gray-200">
+            {isLoading ? (
+              <span className="text-sm text-gray-500">Завантаження...</span>
+            ) : isAuthenticated ? (
+              <div className="flex items-center gap-4">
+                <img 
+                  src={user?.picture} 
+                  alt={user?.name} 
+                  className="w-8 h-8 rounded-full border border-gray-200" 
+                />
+                <span className="text-sm font-medium text-gray-700">{user?.name}</span>
+                <button 
+                  onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+                  className="text-sm font-medium text-red-600 hover:text-red-700 transition"
+                >
+                  Вийти
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => loginWithRedirect()}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+              >
+                Увійти
+              </button>
+            )}
+          </div>
+
         </div>
       </header>
+      
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         <Outlet /> 
       </main>
