@@ -13,6 +13,8 @@ export interface Auction {
 }
 
 export interface PaginatedList<T>{
+    hasNextPage: any;
+    hasPreviousPage: any;
     items: T[];
     pageNumber: number;
     totalPages: number;

@@ -1,63 +1,119 @@
-import {useEffect, useState} from "react";
-import {axiosClient} from "../api/axiosClient";
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { axiosClient } from "../api/axiosClient";
 import type { Auction, PaginatedList } from '../types/auction';
 import { Link } from 'react-router-dom';
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function AuctionsPage(){
-    const [auctions, setAuctions] = useState<Auction[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+export function AuctionsPage() {
+    const [pageNumber, setPageNumber] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const pageSize = 9; 
 
     useEffect(() => {
-        const fetchAuctions = async () => {
-            try {
-                const response = await axiosClient.get<PaginatedList<Auction>>('/Auctions/active');
-                setAuctions(response.data.items);
-            } catch (err) {
-                console.error('Помилка при завантаженні аукціонів:', err);
-                setError('Не вдалося завантажити аукціони. Спробуйте пізніше.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-    fetchAuctions();
-    }, []);
-    
-    if (isLoading) {
-        return <div className="p-8 text-xl font-bold text-gray-500">Завантаження аукціонів...</div>;
-    }
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPageNumber(1); 
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
-    if (error) {
-        return <div className="p-8 text-xl font-bold text-red-500">{error}</div>;
-    }
+    const fetchAuctions = async (page: number, search: string): Promise<PaginatedList<Auction>> => {
+        const response = await axiosClient.get<PaginatedList<Auction>>(`/Auctions/active`, {
+            params: { 
+                pageNumber: page, 
+                pageSize,
+                searchTerm: search || undefined 
+            }
+        });
+        return response.data;
+    };
+
+    const { data, isLoading, isError } = useQuery({
+        queryKey: ['auctions', 'active', pageNumber, debouncedSearch],
+        queryFn: () => fetchAuctions(pageNumber, debouncedSearch),
+        placeholderData: (previousData) => previousData,
+    });
 
     return (
-        <div>
-            <h2 className="text-3xl font-bold text-gray-800">Всі аукціони</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">  
-                {auctions.map((auction) => (
-                   <div key={auction.id} className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{auction.title}</h3>
-                    <p className="text-gray-600 mb-1">
-                        Поточна ціна: <span className="font-bold text-green-600 text-lg">{auction.currentPrice} ₴</span>
-                    </p>
-                    <p className="text-sm text-gray-500">
-                        Закінчується: {new Date(auction.endsAt).toLocaleString('uk-UA')}
-                    </p>
-
-                    <Link 
-                        to={`/auctions/${auction.id}`} 
-                        className="mt-4 block text-center w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        Зробити ставку
-                    </Link>
+        <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <h2 className="text-3xl font-bold text-gray-900">Всі аукціони</h2>
+                
+                <div className="w-full md:w-1/3">
+                    <Input 
+                        type="text" 
+                        placeholder="Пошук аукціонів..." 
+                        value={searchTerm}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}                        
+                        className="w-full"
+                    />
                 </div>
-            ))}
-        </div>
-        {auctions.length === 0 && (
-            <div className="text-gray-500 text-lg">Наразі немає активних аукціонів.</div>
-        )}
+            </div>
+            
+            {isLoading && <div className="p-8 text-xl font-bold text-gray-500 text-center">Завантаження аукціонів...</div>}
+            {isError && <div className="p-8 text-xl font-bold text-red-500 text-center">Не вдалося завантажити аукціони. Спробуйте пізніше.</div>}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">  
+                {data?.items?.map((auction) => (
+                    <Card key={auction.id} className="flex flex-col justify-between hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="text-xl line-clamp-1" title={auction.title}>
+                                {auction.title}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-gray-600 mb-2">
+                                Поточна ціна: <span className="font-bold text-green-600 text-2xl">{auction.currentPrice} ₴</span>
+                            </p>
+                            <p className="text-sm text-gray-500">
+                                Закінчується: {new Date(auction.endsAt).toLocaleString('uk-UA')}
+                            </p>
+                        </CardContent>
+                        <CardFooter>
+                       <Link 
+                            to={`/auctions/${auction.id}`} 
+                            className={buttonVariants({ variant: "default", className: "w-full" })}
+                        >
+                            Зробити ставку
+                        </Link>
+                        </CardFooter>
+                    </Card>
+                ))}
+            </div>
+
+            {data?.items?.length === 0 && !isLoading && (
+                <div className="text-gray-500 text-lg mt-10 text-center bg-gray-50 p-8 rounded-lg border border-dashed">
+                    За вашим запитом нічого не знайдено.
+                </div>
+            )}
+
+            {data && data.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-10 p-4 bg-white border rounded-lg shadow-sm">
+                    <Button 
+                        variant="outline"
+                        onClick={() => setPageNumber(old => Math.max(old - 1, 1))}
+                        disabled={!data.hasPreviousPage}
+                    >
+                        &larr; Попередня
+                    </Button>
+                    
+                    <span className="font-medium text-gray-600 text-sm">
+                        Сторінка {data.pageNumber} з {data.totalPages}
+                    </span>
+                    
+                    <Button 
+                        variant="outline"
+                        onClick={() => setPageNumber(old => old + 1)}
+                        disabled={!data.hasNextPage}
+                    >
+                        Наступна &rarr;
+                    </Button>
+                </div>
+            )}
         </div>
     );
-
 }
