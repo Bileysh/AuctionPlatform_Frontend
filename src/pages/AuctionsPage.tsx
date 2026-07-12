@@ -1,25 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { axiosClient } from "../api/axiosClient";
 import type { Auction, PaginatedList } from '../types/auction';
 import { Link } from 'react-router-dom';
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSignalR } from '@/hooks/useSignalR';
+import { useDebounce } from '@/hooks/useDebounce';
+import { HubConnectionState } from '@microsoft/signalr';
 
 export function AuctionsPage() {
+    const queryClient = useQueryClient();
     const [pageNumber, setPageNumber] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const debouncedSearch = useDebounce(searchTerm, 500);
     const pageSize = 9; 
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(searchTerm);
-            setPageNumber(1); 
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchTerm]);
+        setPageNumber(1);
+    }, [debouncedSearch]);
 
     const fetchAuctions = async (page: number, search: string): Promise<PaginatedList<Auction>> => {
         const response = await axiosClient.get<PaginatedList<Auction>>(`/Auctions/active`, {
@@ -37,6 +37,41 @@ export function AuctionsPage() {
         queryFn: () => fetchAuctions(pageNumber, debouncedSearch),
         placeholderData: (previousData) => previousData,
     });
+
+    const { connection, isConnected } = useSignalR('http://localhost:5130/hubs/auction');
+
+   useEffect(() => {
+    if (!connection || !isConnected) return;
+
+    connection.on("AuctionCreated", () => {
+        queryClient.invalidateQueries({ queryKey: ['auctions', 'active'] });
+    });
+
+    connection.on("AuctionPriceUpdated", (auctionId: string, newPrice: number) => {
+        queryClient.setQueriesData(
+            { queryKey: ['auctions', 'active'] },
+            (oldData: PaginatedList<Auction> | undefined) => {
+                if (!oldData) return oldData;
+                return {
+                    ...oldData,
+                    items: oldData.items.map(auction =>
+                        auction.id === auctionId
+                            ? { ...auction, currentPrice: newPrice }
+                            : auction
+                    )
+                };
+            }
+        );
+    });
+
+    connection.invoke("JoinActiveAuctionsGroup").catch(console.error);
+
+    return () => {
+        connection.off("AuctionCreated");
+            connection.off("AuctionPriceUpdated"); 
+            connection.invoke("LeaveActiveAuctionsGroup").catch(console.error);
+        };
+    }, [connection, isConnected, queryClient]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">

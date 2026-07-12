@@ -1,9 +1,30 @@
-import { Link, Outlet } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth0 } from "@auth0/auth0-react";
+import { useQuery } from "@tanstack/react-query";
+import { Link, Outlet } from "react-router-dom";
+import { axiosClient } from "../api/axiosClient";
+import { Button } from "@/components/ui/button";
+
+interface UserProfile {
+    id: string;
+    userName: string;
+    auth0Id: string;
+    totalBalance: number;
+    availableBalance: number;
+}
 
 export function Layout() {
  const { isAuthenticated, loginWithRedirect, logout, user, isLoading } = useAuth0();
-  return (
+  
+ const {data: userProfile} = useQuery({
+    queryKey: ['userProfile'],
+    queryFn: async () => {
+      const response = await axiosClient.get<UserProfile>('/Users/me');
+      return response.data;
+    },
+    enabled: isAuthenticated
+  });
+ 
+ return (
 
     <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
       <header className="bg-white shadow-sm sticky top-0 z-10">
@@ -23,20 +44,28 @@ export function Layout() {
             {isLoading ? (
               <span className="text-sm text-gray-500">Завантаження...</span>
             ) : isAuthenticated ? (
-              <div className="flex items-center gap-4">
-                <img 
-                  src={user?.picture} 
-                  alt={user?.name} 
-                  className="w-8 h-8 rounded-full border border-gray-200" 
-                />
-                <span className="text-sm font-medium text-gray-700">{user?.name}</span>
-                <button 
-                  onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-                  className="text-sm font-medium text-red-600 hover:text-red-700 transition"
-                >
-                  Вийти
-                </button>
-              </div>
+                <div className="flex items-center gap-4">
+                      {userProfile && (
+                        <div className="text-sm bg-gray-100 px-3 py-1.5 rounded-md font-medium text-gray-800 border border-gray-200">
+                              Доступно: <span className="text-green-600 font-bold">{userProfile.availableBalance} ₴</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={user?.picture} 
+                          alt={user?.name} 
+                          className="w-8 h-8 rounded-full border border-gray-200" 
+                        />
+                        <span className="text-sm font-medium text-gray-700">{user?.name}</span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+                  >
+                    Вийти
+                  </Button>
+                </div>
             ) : (
               <button 
                 onClick={() => loginWithRedirect()}

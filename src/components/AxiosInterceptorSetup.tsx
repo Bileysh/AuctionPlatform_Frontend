@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { axiosClient } from "../api/axiosClient";
 
 export function AxiosInterceptorSetup() {
-  const { getAccessTokenSilently } = useAuth0();
+  const { getAccessTokenSilently, loginWithRedirect } = useAuth0();
 
   useEffect(() => {
     const requestInterceptor = axiosClient.interceptors.request.use(
@@ -14,8 +14,7 @@ export function AxiosInterceptorSetup() {
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
           }
-        } catch {
-          console.debug("User is not authenticated, sending request without token.");
+        } catch(e){
         }
         return config;
       },
@@ -24,10 +23,23 @@ export function AxiosInterceptorSetup() {
       }
     );
 
+    const responseInterceptor = axiosClient.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response && error.response.status === 401) {
+          await loginWithRedirect({
+            appState: {targetUrl: window.location.pathname}
+          });
+        }
+        return Promise.reject(error);
+      }
+    );
+
     return () => {
       axiosClient.interceptors.request.eject(requestInterceptor);
+      axiosClient.interceptors.response.eject(responseInterceptor);
     };
-  }, [getAccessTokenSilently]);
+  }, [getAccessTokenSilently, loginWithRedirect]);
 
   return null; 
 }

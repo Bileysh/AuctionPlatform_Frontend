@@ -6,7 +6,12 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-
+import type { AxiosError } from 'axios';
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner"; 
+import { useEffect } from 'react'; 
+import { useSignalR } from '../hooks/useSignalR';
 
 const bidSchema = z.object({
     amount: z.number({ 
@@ -20,7 +25,6 @@ export function AuctionDetailsPage() {
     const { id } = useParams<{id: string}>();
     const queryClient = useQueryClient();
     const { isAuthenticated, loginWithRedirect } = useAuth0();
-
     const {
         register,
         handleSubmit,
@@ -31,7 +35,35 @@ export function AuctionDetailsPage() {
         resolver: zodResolver(bidSchema),
     });
 
-    const {data: auction, isLoading, isError: isPageError} = useQuery({
+    const { connection, isConnected } = useSignalR('http://localhost:5130/hubs/auction');
+
+    useEffect(() => {
+            if (!connection || !id || !isConnected) return;
+
+            connection.invoke("JoinAuctionGroup", id)
+                .then(() => console.log(`Joined auction group for auction ${id}`))
+                .catch(err => console.error('Error joining auction group: ', err));
+
+            connection.on("ReceiveNewBid", (newAmount: number) => {
+                queryClient.setQueryData(['auction', id], (oldData: Auction | undefined) => {
+                    if(!oldData) return oldData;
+                    return {
+                        ...oldData,
+                        currentPrice: newAmount
+                    };
+                });
+            });
+
+            return () => {
+                connection.invoke("LeaveAuctionGroup", id)
+                    .then(() => console.log(`Left auction group for auction ${id}`))
+                    .catch(err => console.error('Error leaving auction group: ', err));
+                connection.off("ReceiveNewBid");
+            };
+    }, [connection, id, isConnected, queryClient]);
+
+
+    const { data: auction, isLoading, isError: isPageError } = useQuery({
         queryKey: ['auction', id],
         queryFn: async() =>{
             const response = await axiosClient.get<Auction>(`/Auctions/${id}`);
@@ -45,7 +77,7 @@ export function AuctionDetailsPage() {
             await axiosClient.post(`/Auctions/${id}/bid`, {amount});
         },
         onSuccess: () => {
-            alert('Ставка успішно зроблена!')
+            toast.success('Ставка успішно зроблена!'); 
             reset();
             queryClient.invalidateQueries({queryKey: ['auction', id]});
         }
@@ -68,23 +100,23 @@ export function AuctionDetailsPage() {
         placeBidMutation.mutate(data.amount);
     };
 
-    const getBackendErrorMessage = (err: any) => {
+    const getBackendErrorMessage = (err: AxiosError<{ detail?: string; Detail?: string }>) => {
         const data = err?.response?.data;
         return data?.detail || data?.Detail || 'Сталася помилка при відправці ставки.';
     };
 
-    if (isLoading) return <div className="text-gray-500 p-8">Завантаження деталей...</div>;
-    if (isPageError || !auction) return <div className="text-red-500 p-8">Не вдалося завантажити деталі аукціону. Спробуйте пізніше.</div>;
+    if (isLoading) return <div className="text-gray-500 p-8 text-xl text-center font-medium">Завантаження деталей...</div>;
+    if (isPageError || !auction) return <div className="text-red-500 p-8 text-xl text-center font-medium">Не вдалося завантажити деталі аукціону.</div>;
     
     return (
-        <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-            <Link to="/auctions" className="text-blue-600 hover:underline mb-6 inline-block">
+        <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100 my-8">
+            <Link to="/auctions" className={buttonVariants({ variant: "link", className: "mb-6 pl-0" })}>
                 &larr; Назад до списку
             </Link>
             
             <h2 className="text-3xl font-bold text-gray-900 mb-4">{auction.title}</h2>
             
-            <div className="bg-gray-50 p-6 rounded-lg mb-6">
+            <div className="bg-gray-50 p-6 rounded-lg mb-6 border border-gray-100">
                 <p className="text-gray-600 text-lg mb-2">
                     Поточна ціна: <span className="text-3xl font-bold text-green-600">{auction.currentPrice} ₴</span>
                 </p>
@@ -98,15 +130,13 @@ export function AuctionDetailsPage() {
                     <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="bid">
                         Ваша ставка
                     </label>
-                    <input 
+                    <Input 
                         id="bid"
                         type="number" 
                         step="0.01" 
-                        {...register("amount", { valueAsNumber: true })} // <--- ЗМІНА ТУТ
+                        {...register("amount", { valueAsNumber: true })}
                         placeholder={`Більше ніж ${auction.currentPrice}`}
-                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                            errors.amount ? 'border-red-500 focus:ring-red-200' : 'border-gray-300 focus:ring-blue-600'
-                        }`}
+                        className={errors.amount ? 'border-red-500 focus-visible:ring-red-200' : ''}
                     />
                     {errors.amount && (
                         <p className="text-red-500 text-sm mt-1">{errors.amount.message}</p>
@@ -114,18 +144,18 @@ export function AuctionDetailsPage() {
                 </div>
 
                 {placeBidMutation.isError && (
-                    <div className="text-red-500 mb-4 font-medium">
-                        {getBackendErrorMessage(placeBidMutation.error)}
+                    <div className="text-red-500 mb-4 font-medium p-3 bg-red-50 rounded-md border border-red-100">
+                        {getBackendErrorMessage(placeBidMutation.error as AxiosError<{ detail?: string; Detail?: string }>)}
                     </div>
                 )}
 
-                <button 
+                <Button 
                     type="submit"
                     disabled={placeBidMutation.isPending}
-                    className="w-full bg-blue-600 text-white text-lg font-semibold py-4 rounded-lg hover:bg-blue-700 transition disabled:bg-blue-400"
+                    className="w-full text-lg h-12"
                 >
                     {placeBidMutation.isPending ? 'Обробка...' : (isAuthenticated ? 'Підтвердити ставку' : 'Увійти, щоб зробити ставку')}
-                </button>
+                </Button>
             </form>
         </div>
     );
