@@ -10,6 +10,7 @@ export interface Auction {
     winnerId?: string | null;
     categoryName?: string;
     status: 'Active' | 'Closed' | 'Cancelled';
+    bids: Bid[];
 }
 
 export interface PaginatedList<T>{
@@ -19,4 +20,11 @@ export interface PaginatedList<T>{
     pageNumber: number;
     totalPages: number;
     totalCount: number;
+}
+
+export interface Bid {
+    id: string;
+    bidderName: string;
+    amount: number;
+    createdAt: string;
 }

@@ -35,7 +35,7 @@ export function AuctionDetailsPage() {
         resolver: zodResolver(bidSchema),
     });
 
-    const { connection, isConnected } = useSignalR('http://localhost:5130/hubs/auction');
+    const { connection, isConnected } = useSignalR(`${import.meta.env.VITE_API_URL}/hubs/auction`);
 
     useEffect(() => {
             if (!connection || !id || !isConnected) return;
@@ -44,21 +44,23 @@ export function AuctionDetailsPage() {
                 .then(() => console.log(`Joined auction group for auction ${id}`))
                 .catch(err => console.error('Error joining auction group: ', err));
 
-            connection.on("ReceiveNewBid", (newAmount: number) => {
-                queryClient.setQueryData(['auction', id], (oldData: Auction | undefined) => {
-                    if(!oldData) return oldData;
-                    return {
-                        ...oldData,
-                        currentPrice: newAmount
-                    };
-                });
+            connection.on("ReceiveNewBid", () => {
+                queryClient.invalidateQueries({ queryKey: ['auction', id] });
             });
 
+            connection.on("AuctionClosed", (closedAuctionId: string) => {
+                if (closedAuctionId === id) {
+                    console.log('Цей аукціон щойно завершився!');
+                    queryClient.invalidateQueries({ queryKey: ['auction', id] });
+                }
+            });
+            
             return () => {
                 connection.invoke("LeaveAuctionGroup", id)
                     .then(() => console.log(`Left auction group for auction ${id}`))
                     .catch(err => console.error('Error leaving auction group: ', err));
                 connection.off("ReceiveNewBid");
+                connection.off("AuctionClosed");
             };
     }, [connection, id, isConnected, queryClient]);
 
@@ -80,6 +82,7 @@ export function AuctionDetailsPage() {
             toast.success('Ставка успішно зроблена!'); 
             reset();
             queryClient.invalidateQueries({queryKey: ['auction', id]});
+            queryClient.invalidateQueries({queryKey: ['userProfile']});
         }
     });
 
@@ -124,39 +127,79 @@ export function AuctionDetailsPage() {
                     Завершується: {new Date(auction.endsAt).toLocaleString('uk-UA')}
                 </p>
             </div>
+            
+            {auction.status === 'Active' ? (
+                <form onSubmit={handleSubmit(onSubmit)} className="mb-4">
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="bid">
+                            Ваша ставка
+                        </label>
+                        <Input 
+                            id="bid"
+                            type="number" 
+                            step="0.01" 
+                            {...register("amount", { valueAsNumber: true })}
+                            placeholder={`Більше ніж ${auction.currentPrice}`}
+                            className={errors.amount ? 'border-red-500 focus-visible:ring-red-200' : ''}
+                        />
+                        {errors.amount && (
+                            <p className="text-red-500 text-sm mt-1">{errors.amount.message}</p>
+                        )}
+                    </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="mb-4">
-                <div className="mb-4">
-                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="bid">
-                        Ваша ставка
-                    </label>
-                    <Input 
-                        id="bid"
-                        type="number" 
-                        step="0.01" 
-                        {...register("amount", { valueAsNumber: true })}
-                        placeholder={`Більше ніж ${auction.currentPrice}`}
-                        className={errors.amount ? 'border-red-500 focus-visible:ring-red-200' : ''}
-                    />
-                    {errors.amount && (
-                        <p className="text-red-500 text-sm mt-1">{errors.amount.message}</p>
+                    {placeBidMutation.isError && (
+                        <div className="text-red-500 mb-4 font-medium p-3 bg-red-50 rounded-md border border-red-100">
+                            {getBackendErrorMessage(placeBidMutation.error as AxiosError<{ detail?: string; Detail?: string }>)}
+                        </div>
                     )}
-                </div>
 
-                {placeBidMutation.isError && (
-                    <div className="text-red-500 mb-4 font-medium p-3 bg-red-50 rounded-md border border-red-100">
-                        {getBackendErrorMessage(placeBidMutation.error as AxiosError<{ detail?: string; Detail?: string }>)}
+                    <Button 
+                        type="submit"
+                        disabled={placeBidMutation.isPending}
+                        className="w-full text-lg h-12"
+                    >
+                        {placeBidMutation.isPending ? 'Обробка...' : (isAuthenticated ? 'Підтвердити ставку' : 'Увійти, щоб зробити ставку')}
+                    </Button>
+                </form>
+            ) : (
+                <div className="bg-gray-100 p-6 rounded-lg text-center border border-gray-200 mt-6">
+                    <p className="text-2xl font-bold text-gray-800 mb-2">Аукціон завершено</p>
+                    <p className="text-gray-600">
+                        Фінальна ціна: <span className="font-bold text-green-600">{auction.currentPrice} ₴</span>
+                    </p>
+                </div>
+            )}
+
+            <div className="mt-8 border-t border-gray-200 pt-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Історія ставок</h3>
+                
+                {!auction.bids || auction.bids.length === 0 ? (
+                    <p className="text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-gray-100">
+                        Ставок ще немає. Будьте першим!
+                    </p>
+                ) : (
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                        <ul className="divide-y divide-gray-200">
+                            {auction.bids.map((bid) => (
+                                <li key={bid.id} className="p-4 hover:bg-gray-50 flex justify-between items-center transition-colors">
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold text-gray-800">
+                                            {bid.bidderName}
+                                        </span>
+                                        <span className="text-sm text-gray-500">
+                                            {new Date(bid.createdAt).toLocaleString('uk-UA')}
+                                        </span>
+                                    </div>
+                                    <div className="text-lg font-bold text-blue-600">
+                                        {bid.amount} ₴
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
+            </div>
 
-                <Button 
-                    type="submit"
-                    disabled={placeBidMutation.isPending}
-                    className="w-full text-lg h-12"
-                >
-                    {placeBidMutation.isPending ? 'Обробка...' : (isAuthenticated ? 'Підтвердити ставку' : 'Увійти, щоб зробити ставку')}
-                </Button>
-            </form>
         </div>
     );
 }

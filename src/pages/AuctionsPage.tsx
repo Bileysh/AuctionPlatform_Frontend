@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSignalR } from '@/hooks/useSignalR';
 import { useDebounce } from '@/hooks/useDebounce';
-import { HubConnectionState } from '@microsoft/signalr';
 
 export function AuctionsPage() {
     const queryClient = useQueryClient();
@@ -38,7 +37,7 @@ export function AuctionsPage() {
         placeholderData: (previousData) => previousData,
     });
 
-    const { connection, isConnected } = useSignalR('http://localhost:5130/hubs/auction');
+    const { connection, isConnected } = useSignalR(`${import.meta.env.VITE_API_URL}/hubs/auction`);
 
    useEffect(() => {
     if (!connection || !isConnected) return;
@@ -64,12 +63,27 @@ export function AuctionsPage() {
         );
     });
 
+    connection.on("AuctionClosed", (auctionId: string) => {
+        console.log(`Auction ${auctionId} closed by background worker. Removing from UI...`);
+                queryClient.setQueriesData(
+            { queryKey: ['auctions', 'active'] },
+            (oldData: PaginatedList<Auction> | undefined) => {
+                if (!oldData) return oldData;
+                return {
+                    ...oldData,
+                    items: oldData.items.filter(auction => auction.id !== auctionId)
+                };
+            }
+        );
+    });
+
     connection.invoke("JoinActiveAuctionsGroup").catch(console.error);
 
     return () => {
         connection.off("AuctionCreated");
-            connection.off("AuctionPriceUpdated"); 
-            connection.invoke("LeaveActiveAuctionsGroup").catch(console.error);
+        connection.off("AuctionPriceUpdated"); 
+        connection.off("AuctionClosed");
+        connection.invoke("LeaveActiveAuctionsGroup").catch(console.error);
         };
     }, [connection, isConnected, queryClient]);
 
