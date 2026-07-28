@@ -4,6 +4,8 @@ import { HomePage } from "./pages/HomePage";
 import { AuctionsPage } from "./pages/AuctionsPage";
 import { AuctionDetailsPage } from "./pages/AuctionDetailsPage";
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
+import CreateAuctionPage from './pages/CreateAuctionPage';
+import { ProfilePage } from "./pages/ProfilePage";
 
 function App(){
   return(
@@ -13,7 +15,9 @@ function App(){
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="auctions" element={<AuctionsPage />} />
+            <Route path="/auctions/create" element={<CreateAuctionPage />} />
             <Route path="auctions/:id" element={<AuctionDetailsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Routes>
     </BrowserRouter>

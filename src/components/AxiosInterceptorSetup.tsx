@@ -15,6 +15,7 @@ export function AxiosInterceptorSetup() {
             config.headers.Authorization = `Bearer ${token}`;
           }
         } catch(e){
+          console.error('Error fetching access token: ', e);
         }
         return config;
       },

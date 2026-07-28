@@ -17,6 +17,7 @@ export function AuctionsPage() {
     const pageSize = 9; 
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setPageNumber(1);
     }, [debouncedSearch]);
 

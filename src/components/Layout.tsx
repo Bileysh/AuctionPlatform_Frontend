@@ -39,6 +39,12 @@ export function Layout() {
             <Link to="/auctions" className="font-medium text-gray-600 hover:text-blue-600 transition">
               Всі аукціони
             </Link>
+            <Link to="/auctions/create">
+              Створити аукціон
+            </Link>
+            <Link to="/profile">
+              Особистий кабінет
+            </Link>
           </nav>
           <div className="flex items-center border-l pl-8 border-gray-200">
             {isLoading ? (

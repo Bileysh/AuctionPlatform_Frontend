@@ -162,11 +162,21 @@ export function AuctionDetailsPage() {
                     </Button>
                 </form>
             ) : (
-                <div className="bg-gray-100 p-6 rounded-lg text-center border border-gray-200 mt-6">
-                    <p className="text-2xl font-bold text-gray-800 mb-2">Аукціон завершено</p>
-                    <p className="text-gray-600">
-                        Фінальна ціна: <span className="font-bold text-green-600">{auction.currentPrice} ₴</span>
+                <div className="bg-green-50 border border-green-200 p-6 rounded-xl text-center shadow-sm mt-6">
+                    <h3 className="text-2xl font-bold text-green-800 mb-2">🎉 Аукціон завершено!</h3>
+                    <p className="text-lg text-green-700 mb-1">
+                        Фінальна ціна: <span className="font-bold">{auction.currentPrice} ₴</span>
                     </p>
+                    
+                    {auction.bids && auction.bids.length > 0 ? (
+                        <p className="text-md text-green-600 mt-2">
+                            Переможець: <span className="font-bold border-b border-green-600 pb-0.5">{auction.bids[0].bidderName}</span>
+                        </p>
+                    ) : (
+                        <p className="text-md text-gray-500 mt-2">
+                            На жаль, аукціон завершився без жодної ставки.
+                        </p>
+                    )}
                 </div>
             )}
 
