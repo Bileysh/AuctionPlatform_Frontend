@@ -16,11 +16,9 @@ function App(){
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="auctions" element={<AuctionsPage />} />
-            <Route path="/auctions/create" element={<CreateAuctionPage />} />
             <Route path="auctions/:id" element={<AuctionDetailsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/auctions/create" element={ <ProtectedRoute><CreateAuctionPage /></ProtectedRoute>} />
-          </Route>
+            <Route path="/auctions/create" element={<ProtectedRoute><CreateAuctionPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} /></Route>
         </Routes>
     </BrowserRouter>
   );
