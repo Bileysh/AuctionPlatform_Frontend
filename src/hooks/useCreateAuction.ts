@@ -24,7 +24,7 @@ export const useCreateAuction = () => {
         onSuccess: (newAuctionId) => {
             queryClient.invalidateQueries({ queryKey: ['auctions'] });
             toast.success('Аукціон успішно створено!');
-            navigate(`/Auctions/${newAuctionId}`); 
+            navigate(`/auctions/${newAuctionId}`);
         },
         onError: (error: unknown) => {
             console.error('Error creating auction: ', error);

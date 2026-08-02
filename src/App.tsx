@@ -6,6 +6,7 @@ import { AuctionDetailsPage } from "./pages/AuctionDetailsPage";
 import { AxiosInterceptorSetup } from './components/AxiosInterceptorSetup';
 import CreateAuctionPage from './pages/CreateAuctionPage';
 import { ProfilePage } from "./pages/ProfilePage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function App(){
   return(
@@ -18,6 +19,7 @@ function App(){
             <Route path="/auctions/create" element={<CreateAuctionPage />} />
             <Route path="auctions/:id" element={<AuctionDetailsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/auctions/create" element={ <ProtectedRoute><CreateAuctionPage /></ProtectedRoute>} />
           </Route>
         </Routes>
     </BrowserRouter>

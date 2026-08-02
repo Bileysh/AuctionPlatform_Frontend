@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function ProfilePage() {
-    const [myAuctionsPage] = useState(1);
-    const [myBidsPage] = useState(1);
+    const [myAuctionsPage, setMyAuctionsPage] = useState(1);
+    const [myBidsPage, setMyBidsPage] = useState(1);
 
     const { data: myAuctionsData, isLoading: loadingAuctions } = useMyAuctions(myAuctionsPage);
     const { data: myBidsData, isLoading: loadingBids } = useMyBids(myBidsPage);
@@ -23,7 +23,7 @@ export function ProfilePage() {
                 <TabsContent value="bids">
                     {loadingBids ? (
                         <p>Завантаження...</p>
-                    ) : myBidsData?.items.length === 0 ? (
+                    ) : myBidsData?.items.length === 0 && myBidsPage === 1 ? (
                         <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">
                             Ви ще не робили ставок. <Link to="/auctions" className="text-blue-600 underline">Знайти цікаві лоти</Link>
                         </div>
@@ -46,6 +46,28 @@ export function ProfilePage() {
                                     </div>
                                 </div>
                             ))}
+                            
+                            {myBidsData?.items && myBidsData.items.length > 0 && (
+                                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+                                    <button 
+                                        disabled={myBidsPage === 1} 
+                                        onClick={() => setMyBidsPage(p => p - 1)}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Попередня
+                                    </button>
+                                    <span className="text-sm text-gray-500">Сторінка {myBidsPage}</span>
+                                    <button 
+                                        // Якщо бекенд повертає hasNextPage або totalPages, краще використовувати їх тут. 
+                                        // Поки що просто перевіряємо, чи є елементи на поточній сторінці.
+                                        disabled={myBidsData.items.length === 0} 
+                                        onClick={() => setMyBidsPage(p => p + 1)}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Наступна
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </TabsContent>
@@ -53,7 +75,7 @@ export function ProfilePage() {
                 <TabsContent value="auctions">
                     {loadingAuctions ? (
                         <p>Завантаження...</p>
-                    ) : myAuctionsData?.items.length === 0 ? (
+                    ) : myAuctionsData?.items.length === 0 && myAuctionsPage === 1 ? (
                         <div className="text-center p-8 text-gray-500 bg-gray-50 rounded-lg">
                             Ви ще не створили жодного лота. <Link to="/auctions/create" className="text-blue-600 underline">Створити зараз</Link>
                         </div>
@@ -78,6 +100,27 @@ export function ProfilePage() {
                                     </div>
                                 </div>
                             ))}
+
+                            {/* 3. Додано кнопки пагінації для лотів */}
+                            {myAuctionsData?.items && myAuctionsData.items.length > 0 && (
+                                <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+                                    <button 
+                                        disabled={myAuctionsPage === 1} 
+                                        onClick={() => setMyAuctionsPage(p => p - 1)}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Попередня
+                                    </button>
+                                    <span className="text-sm text-gray-500">Сторінка {myAuctionsPage}</span>
+                                    <button 
+                                        disabled={myAuctionsData.items.length === 0} 
+                                        onClick={() => setMyAuctionsPage(p => p + 1)}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        Наступна
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </TabsContent>

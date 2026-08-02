@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { axiosClient } from "../api/axiosClient";
 import { useParams, Link } from "react-router-dom";
@@ -74,15 +75,40 @@ export function AuctionDetailsPage() {
         enabled: !!id
     });
 
+    const getBackendErrorMessage = (err: AxiosError<{ detail?: string; Detail?: string }>) => {
+        const data = err?.response?.data;
+        return data?.detail || data?.Detail || 'Сталася помилка при відправці ставки.';
+    };
+
     const placeBidMutation = useMutation({
         mutationFn: async (amount: number) =>{
             await axiosClient.post(`/Auctions/${id}/bid`, {amount});
+        },
+        retry: (failureCount, error: any) => {
+            const status = error.response?.status;
+            if ((status === 409 || status === 429) && failureCount < 3) {
+                return true; 
+            }
+            return false;
+        },
+        retryDelay: (attemptIndex) => {
+            return Math.min(500 * (2 ** attemptIndex), 30000); 
         },
         onSuccess: () => {
             toast.success('Ставка успішно зроблена!'); 
             reset();
             queryClient.invalidateQueries({queryKey: ['auction', id]});
             queryClient.invalidateQueries({queryKey: ['userProfile']});
+        },
+        onError: (error: any) => {
+            const status = error.response?.status;
+            if (status === 409) {
+                toast.error("Хтось щойно перебив вашу ставку! Оновіть сторінку та спробуйте ще раз.");
+            } else if (status === 429) {
+                toast.error("Ви робите ставки занадто швидко. Зачекайте пару секунд.");
+            } else {
+                toast.error(getBackendErrorMessage(error));
+            }
         }
     });
 
@@ -101,11 +127,6 @@ export function AuctionDetailsPage() {
         }
 
         placeBidMutation.mutate(data.amount);
-    };
-
-    const getBackendErrorMessage = (err: AxiosError<{ detail?: string; Detail?: string }>) => {
-        const data = err?.response?.data;
-        return data?.detail || data?.Detail || 'Сталася помилка при відправці ставки.';
     };
 
     if (isLoading) return <div className="text-gray-500 p-8 text-xl text-center font-medium">Завантаження деталей...</div>;
@@ -146,12 +167,6 @@ export function AuctionDetailsPage() {
                             <p className="text-red-500 text-sm mt-1">{errors.amount.message}</p>
                         )}
                     </div>
-
-                    {placeBidMutation.isError && (
-                        <div className="text-red-500 mb-4 font-medium p-3 bg-red-50 rounded-md border border-red-100">
-                            {getBackendErrorMessage(placeBidMutation.error as AxiosError<{ detail?: string; Detail?: string }>)}
-                        </div>
-                    )}
 
                     <Button 
                         type="submit"
@@ -209,7 +224,6 @@ export function AuctionDetailsPage() {
                     </div>
                 )}
             </div>
-
         </div>
     );
 }
